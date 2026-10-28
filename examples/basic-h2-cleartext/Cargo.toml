@@ -1,0 +1,23 @@
+[package]
+name = "yaws-h2spec-basic-h2-cleartext"
+version = "0.0.1"
+edition = "2024"
+description = "Basic h2 cleartext server"
+homepage = "https://github.com/yaws-rs/h2spec"
+keywords = ["io", "uring", "epoll", "async"]
+license = "Apache-2.0/MIT"
+readme = "README.md"
+repository = "https://github.com/yaws-rs/h2spec"
+categories = ["science"]
+
+[dependencies]
+blueprint = { version = "0.2.0", default-features = false }
+blueprint-h2spec = { path = "../../blueprint", version = "0.0.1", default-features = false, features = ["h2server"] }
+#yaws-app-rick-roll = { version = "0.0.5", default-features = false }
+
+[features]
+default = []
+std = []
+
+[package.metadata.docs.rs]
+features = []

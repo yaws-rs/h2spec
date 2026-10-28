@@ -1,0 +1,37 @@
+[package]
+name = "h2types"
+version = "0.0.1"
+edition = "2021"
+description = "h2spec core types"
+homepage = "https://github.com/yaws-rs/h2spec"
+keywords = ["io", "uring", "epoll", "async"]
+license = "Apache-2.0/MIT"
+readme = "README.md"
+repository = "https://github.com/yaws-rs/h2spec"
+categories = ["science"]
+
+[dependencies]
+logos = { version = "0.16", default-features = false, features = ["export_derive"] }
+
+[dev-dependencies]
+insta = { version = "1.47" }
+rstest = { version = "0.26" }
+criterion = { version = "0.5" }
+hex = { version = "0.4" }
+
+[features]
+default = []
+alloc = []
+std = []
+
+[package.metadata.docs.rs]
+features = [""]
+
+#[[bench]]
+#name = "bencher"
+#required-features = []
+#harness = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+] }

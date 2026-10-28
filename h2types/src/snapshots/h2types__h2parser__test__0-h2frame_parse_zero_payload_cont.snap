@@ -1,0 +1,52 @@
+---
+source: h2types/src/h2parser.rs
+expression: "Tc { input, res, parser, receiver }"
+---
+Tc {
+    input: [
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ],
+    res: Ok(
+        Incomplete(
+            Payload(
+                2,
+            ),
+            18,
+        ),
+    ),
+    parser: FrameParser {
+        status: Incomplete(
+            Payload(
+                2,
+            ),
+            18,
+        ),
+        cur_frame_id: 2,
+        cur_body_len: 2,
+    },
+    receiver: TestReceiver {
+        headers: [
+            "F[1] FrameType/Settings, FrameFlags/FrameFlags(0), StreamId/StreamId(0), PayloadLen/0",
+            "F[2] FrameType/Settings, FrameFlags/FrameFlags(0), StreamId/StreamId(0), PayloadLen/2",
+        ],
+        payload: [],
+        cur_frame: 2,
+    },
+}

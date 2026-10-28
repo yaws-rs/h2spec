@@ -1,0 +1,38 @@
+[package]
+name = "yaws-h2spec-test-bp"
+version = "0.0.1"
+edition = "2021"
+description = "YAWS Blueprint tester"
+homepage = "https://github.com/yaws-rs/h2spec"
+keywords = ["io", "uring", "epoll", "async"]
+license = "Apache-2.0/MIT"
+readme = "README.md"
+repository = "https://github.com/yaws-rs/h2spec"
+categories = ["science"]
+
+[dependencies]
+blueprint = { version = "0.2", default-features = false }
+blueprint-h2spec = { path = "../blueprint", version = "0.0.1", default-features = false, features = ["h2server"] }
+#yaws-app-rick-roll = { path = "../apps/rick_roll", version = "0.0.5", default-features = false }
+
+[dev-dependencies]
+insta = { version = "1.47" }
+rstest = { version = "0.26" }
+criterion = { version = "0.5" }
+
+[features]
+default = []
+alloc = []
+ptr = []
+static = []
+std = []
+
+[package.metadata.docs.rs]
+features = [""]
+
+#[[bench]]
+#name = "bencher"
+#required-features = []
+#harness = false
+
+[lints.rust]
