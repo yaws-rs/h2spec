@@ -110,7 +110,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cada63ed5241552823ae2e9006cabee98bc414d39879e0bd7b82d908978eeb6"
 dependencies = [
  "blueprint",
- "h11types 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "h11types",
  "ychunked",
 ]
 
@@ -121,7 +121,7 @@ dependencies = [
  "base64",
  "blueprint",
  "criterion",
- "h11types 0.0.4",
+ "h11types",
  "h2types",
  "insta",
  "rstest",
@@ -437,14 +437,6 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 [[package]]
 name = "h11types"
 version = "0.0.4"
-dependencies = [
- "logos 0.16.1",
- "yuri",
-]
-
-[[package]]
-name = "h11types"
-version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0556b51323f1de519f7c73093b7d2ffc29cc16c3fcc81023f25644860a44025b"
 dependencies = [
@@ -459,7 +451,6 @@ dependencies = [
  "criterion",
  "hex",
  "insta",
- "logos 0.16.1",
  "rstest",
 ]
 
@@ -1264,7 +1255,7 @@ dependencies = [
  "blueprint-h11spec",
  "blueprint-h2spec",
  "env_logger",
- "h11types 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "h11types",
  "log",
  "loona-hpack",
  "yaws-app-rick-roll",
