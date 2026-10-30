@@ -28,9 +28,9 @@ jobs:
       - uses: taiki-e/install-action@cargo-hack
       # No default features build
       - name: no_std h2types
-        run: cargo build -p h11types --target thumbv7em-none-eabi --release
+        run: cargo build -p h2types --target thumbv7em-none-eabi --release
       - name: no_std blueprint-h2spec
-        run: cargo build -p blueprint-h11spec --target thumbv7em-none-eabi --release --features h2server
+        run: cargo build -p blueprint-h2spec --target thumbv7em-none-eabi --release --features h2server
 
   check-test-all:
     name: test, fmt, clippy
