@@ -22,14 +22,14 @@ use h11types::{
 };
 
 #[doc(inline)]
-pub use h2types::{FrameFlags as H2FrameFlags, FrameType as H2FrameType, StreamId as H2StreamId};
+pub use h2types::{
+    DataFlags as H2DataFlags, FrameFlags as H2FrameFlags, FrameType as H2FrameType,
+    HeaderFlags as H2HeaderFlags, StreamId as H2StreamId,
+};
 #[doc(inline)]
-pub use h2types::{H2ErrorOut, H2FrameMeta, H2FrameReceiver, H2FrameSender, H2Reset};
+pub use h2types::{H2ErrorOut, H2FrameMeta, H2FrameReceiver, H2FrameSender};
 
-use h2types::FrameParser;
-use h2types::H2RequestMeta;
 use h2types::H2Settings;
-//use h2types::{FrameParser, ParsingStatus, ParsingError};
 
 /// empty for now
 pub struct Position;
@@ -68,6 +68,12 @@ pub(crate) struct StageSenderStatus {
 }
 
 impl StageSenderStatus {
+    pub(crate) fn get_filled(&self) -> Filled {
+        self.filled
+    }
+    pub(crate) fn get_err(&self) -> Option<H2ErrorOut> {
+        self.error
+    }
     pub(crate) fn with_ok(filled: Filled) -> Self {
         Self {
             filled,
@@ -82,6 +88,8 @@ impl StageSenderStatus {
     }
 }
 
+type Upgraded = bool;
+
 /// State machine stages
 #[derive(Debug, Default, PartialEq)]
 enum H2ServingStage {
@@ -95,7 +103,7 @@ enum H2ServingStage {
     /// H11 Upgrade response sending
     H11UpgradeResponse(H11Upgrade),
     /// H2 Server Preface (Settings)
-    ServerSettings,
+    ServerSettings(Upgraded),
     /// H2 Client Preface (Magic)
     ClientPreface,
     /// H2 Expected Client Preface but got wrong
@@ -119,19 +127,8 @@ pub struct H2Serving<App> {
     send_stage: SendStage,
     server_h2settings: H2Settings,
     client_h2settings: H2Settings,
-    //frame_parser: FrameParser,
     app: App,
 }
-
-/*
-impl<App: H2FrameReceiver + H2Reset> H2Serving<App> {
-    fn reset_app(&mut self) {
-        self.stage = H2ServingStage::default();
-        self.server_h2settings = H2Settings::default();
-        self.client_h2settings = H2Settings::default();
-        self.app.reset();
-    }
-} */
 
 const CRLF: &[u8] = "\r\n".as_bytes();
 
@@ -144,7 +141,7 @@ const PREFACE_MAGIC: &[u8] = &[
 
 impl<App> Orbit for H2Serving<App>
 where
-    App: H2FrameSender + H2FrameReceiver + H2Reset,
+    App: H2FrameSender + H2FrameReceiver,
 {
     type Position = Position;
     type Error = H2Error;
@@ -172,17 +169,19 @@ where
         let mut discard = 0;
         let mut shutdown = false;
 
+        let mut ignore_framing = false;
+
         loop {
             match self.stage {
                 H2ServingStage::Start => {
                     if left_in_b[..PREFACE_MAGIC.len()] == *PREFACE_MAGIC {
-                        todo!("Jumpstart known.");
-                        self.stage = H2ServingStage::ServerSettings;
+                        self.stage = H2ServingStage::ServerSettings(false);
                         let _ = left_in_b.split_off_mut(..PREFACE_MAGIC.len());
                         discard += PREFACE_MAGIC.len();
                         continue;
                     }
 
+                    // Technically RFC 9113 deprecated this since nobody used it.
                     let mut try_upgrade = H11Upgrade::default();
                     let mut h11_meta = H11RequestMeta::default();
 
@@ -191,7 +190,7 @@ where
                         Ok(H11StartLineStatus::Incomplete(_, _)) => {
                             break;
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             self.stage = H2ServingStage::BadStart;
                             shutdown = true;
                             break;
@@ -213,7 +212,7 @@ where
                             discard += b;
                             let _ = left_in_b.split_off_mut(..b);
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             self.stage = H2ServingStage::H11BadRequest;
                             continue;
                         }
@@ -240,17 +239,15 @@ where
                         match left_in_b.split_off_mut(..relay_size) {
                             Some(relay_b) => {
                                 discard += relay_b.len();
-                                //self.app.req_body_add(&relay_b);
                             }
                             None => {}
                         }
                     } else {
-                        todo!("RequestBodySize = {:?}", h11_meta.body_size())
+                        self.stage = H2ServingStage::H11BadRequest;
+                        continue;
                     }
                 }
                 H2ServingStage::H11UpgradeResponse(upgrade) => {
-                    println!("Bytes[{}] = {:?}", left_in_b.len(), left_in_b);
-                    println!("H2ServingStage::H11UpgradeResponse");
                     if !upgrade.correct_upgrade() {
                         self.stage = H2ServingStage::H11BadRequest;
                         continue;
@@ -268,10 +265,10 @@ where
                     };
                     out_len += filled;
 
-                    self.stage = H2ServingStage::ServerSettings;
+                    self.stage = H2ServingStage::ServerSettings(true);
                     continue;
                 }
-                H2ServingStage::ServerSettings => {
+                H2ServingStage::ServerSettings(upgraded) => {
                     let mut framer = SettingsFrameOut::default();
 
                     match self.server_h2settings.frame_out(&mut framer) {
@@ -297,7 +294,11 @@ where
                     };
                     out_len += filled;
 
-                    self.stage = H2ServingStage::ClientPreface;
+                    self.stage = match upgraded {
+                        true => H2ServingStage::ClientPreface,
+                        false => H2ServingStage::Framing,
+                    };
+                    ignore_framing = true;
                     break;
                 }
                 H2ServingStage::ClientPreface => {
@@ -347,17 +348,20 @@ where
             }
         }
 
-        if self.stage == H2ServingStage::Framing {
+        if ignore_framing == false && self.stage == H2ServingStage::Framing {
             let h2_frames_res = self.handle_h2frames(left_in_b);
             discard += h2_frames_res.discard;
 
-            if let Some(h2err_out) = h2_frames_res.h2error {
-                todo!("Send out error frame and potentially shutdown.");
+            let remaining = borrow_remaining_left_b(left_out_b, out_len, 22);
+            let send_status = self.send_h2frames(remaining);
+
+            if send_status.get_filled() > 0 {
+                out_len += send_status.get_filled();
             }
 
-            let remaining = borrow_remaining_left_b(left_out_b, 0, 22);
-            let send_status = self.send_h2frames(remaining);
-            todo!("Send_status = {:?}", send_status);
+            if let Some(_err) = send_status.get_err() {
+                l.shutdown();
+            }
         }
 
         let new_in_len = left_in_len - discard;
@@ -372,18 +376,18 @@ where
     }
 }
 
-/// H11Server which implements the [`Orbit`] and [`BluePrint`] traits.
+/// H2Server which implements the [`Orbit`] and [`BluePrint`] traits.
 pub struct H2SpecServer;
 /// Placeholder for H2ServerConfig
 pub struct H2ServerConfig;
 
 impl<App> Default for H2Serving<App>
 where
-    App: H2FrameSender + H2FrameReceiver + H2Reset + Default,
+    App: H2FrameSender + H2FrameReceiver + Default,
 {
     fn default() -> Self {
         let mut server_h2settings = H2Settings::default();
-        server_h2settings.set_enable_push(0u32);
+        let _ = server_h2settings.set_enable_push(0u32);
 
         Self {
             stage: H2ServingStage::default(),
@@ -397,12 +401,12 @@ where
 
 impl<App> H2Serving<App>
 where
-    App: H2FrameSender + H2FrameReceiver + H2Reset + Default,
+    App: H2FrameSender + H2FrameReceiver + Default,
 {
     /// Initialize H2Serving with the specified pre-initialized App
     pub fn with_app(app: App) -> Self {
         let mut server_h2settings = H2Settings::default();
-        server_h2settings.set_enable_push(0u32);
+        let _ = server_h2settings.set_enable_push(0u32);
 
         Self {
             stage: H2ServingStage::default(),
@@ -416,7 +420,7 @@ where
 
 impl<App> BluePrint<H2Serving<App>> for H2SpecServer
 where
-    App: H2FrameSender + H2FrameReceiver + H2Reset + Default,
+    App: H2FrameSender + H2FrameReceiver + Default,
 {
     type Config = H2ServerConfig;
     type Error = H2Error;

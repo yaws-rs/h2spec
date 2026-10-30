@@ -15,7 +15,12 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 use std::time::Duration;
 
-fn init_orbit() -> H2Serving<MyH2App> {
+use log::{debug, info};
+
+use yaws_app_rick_roll::RickRoll;
+
+// Rick Roll is a HTTP/1.1 App but we wrap it into H2Serving
+fn init_orbit() -> H2Serving<MyH2App<RickRoll>> {
     H2SpecServer::with_defaults().unwrap()
 }
 
@@ -52,17 +57,22 @@ fn handle_client(mut tcp: TcpStream) {
         if left.in_bytes_len != 8192 {
             match tcp.read(&mut left.in_bytes[left.in_bytes_len..]) {
                 Ok(0) => {
-                    println!("Client Disconnected.");
+                    info!("Client Disconnected.");
                     break;
                 }
                 Ok(r) => {
+                    let end = left.in_bytes_len + r;
+                    debug!("Read[{}] = {:?}", r, &left.in_bytes[left.in_bytes_len..end]);
                     left.in_bytes_len += r;
                     activity.io_read = true;
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     //std::thread::sleep(Duration::from_millis(10));
                 }
-                Err(e) => panic!("encountered Read IO error: {e}"),
+                Err(e) => {
+                    info!("Giving up on client. Read error: {e}.");
+                    break;
+                }
             }
         }
 
@@ -79,17 +89,7 @@ fn handle_client(mut tcp: TcpStream) {
         }
 
         if left.out_bytes_len != 0 {
-            /*
-            fn save_bin(path: &str, data: &[u8]) {
-                use std::io::Write;
-                let mut f = std::fs::File::create_new(path).unwrap();
-                f.write(data).unwrap();
-                f.flush();
-            }
-            save_bin("/tmp/hmm.bin", &left.out_bytes[..left.out_bytes_len]);
-            */
-
-            println!(
+            debug!(
                 "Sending out[{}] = {:?}",
                 left.out_bytes_len,
                 &left.out_bytes[..left.out_bytes_len]
@@ -102,17 +102,23 @@ fn handle_client(mut tcp: TcpStream) {
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     //std::thread::sleep(Duration::from_millis(10));
                 }
-                Err(e) => panic!("encountered Read IO error: {e}"),
+                Err(_e) => {
+                    info!("Read error. Giving up on client.");
+                    break;
+                }
             }
         }
 
         if !activity.any() {
-            std::thread::sleep(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(1000));
         }
     }
 }
 
 fn main() {
+    env_logger::init();
+
+    info!("Listening for HTTP2 on 127.0.0.1:7878");
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     listener
         .set_nonblocking(true)
@@ -121,6 +127,10 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(s) => {
+                match s.peer_addr() {
+                    Ok(addr) => info!("Accepted a client from {:?}", addr),
+                    Err(_) => info!("Accept a client from unknown address"),
+                }
                 handle_client(s);
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {

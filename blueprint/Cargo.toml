@@ -13,7 +13,7 @@ categories = ["science"]
 [dependencies]
 blueprint = { version = "0.2.0", default-features = false }
 h2types = { path = "../h2types", version = "0.0.1", default-features = false }
-h11types = { path = "../../h11spec/h11types", version = "0.0.3", default-features = false }
+h11types = { path = "../../h11spec/h11types", version = "0.0.4", default-features = false }
 base64 = { version = "0.23", default-features = false }
 
 [dev-dependencies]

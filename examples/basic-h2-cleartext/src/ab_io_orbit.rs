@@ -2,6 +2,8 @@
 
 pub use blueprint::{InBuffer, Left, NoRight};
 
+use log::debug;
+
 /// A/B I/O Left side
 #[derive(Default)]
 pub struct AbIoLeft {
@@ -41,7 +43,7 @@ impl Left for AbIoLeft {
     }
     /// Set the Lengths of Input and Output of Left side
     fn left_set_lens(&mut self, new_len_in: usize, new_len_out: usize) -> () {
-        println!("left_set_lens({new_len_in}, {new_len_out})");
+        debug!("left_set_lens({new_len_in}, {new_len_out})");
         let (cur_len_in, cur_len_out) = self.left_lens();
 
         if new_len_in < cur_len_in {

@@ -2,7 +2,14 @@
 
 use super::*;
 
-impl MyH2App {
+impl<App> MyH2App<App> {
+    #[inline]
+    pub(crate) fn get_cur_mut_any(&mut self) -> Result<&mut CurFrameReceiving, H2ErrorOut> {
+        match self.cur_receive {
+            Some(ref mut cur) => Ok(cur),
+            _ => return Err(H2ErrorOut::Internal),
+        }
+    }
     #[inline]
     pub(crate) fn get_cur_any(&self) -> Result<&CurFrameReceiving, H2ErrorOut> {
         match self.cur_receive {
@@ -19,19 +26,31 @@ impl MyH2App {
         Ok(cur)
     }
     #[inline]
+    pub(crate) fn get_cur_mut(
+        &mut self,
+        exp_type: FrameType,
+    ) -> Result<&mut CurFrameReceiving, H2ErrorOut> {
+        let cur = self.get_cur_mut_any()?;
+        if exp_type != cur.frame_type {
+            return Err(H2ErrorOut::Internal);
+        }
+        Ok(cur)
+    }
+    #[inline]
     pub(crate) fn cur_is_internal(&self) -> bool {
         match self.cur_receive {
             Some(ref c) => c.is_internal(),
             None => false,
         }
     }
+    /*
     #[inline]
     pub(crate) fn get_cur_mut(&mut self) -> Result<&mut CurFrameReceiving, H2ErrorOut> {
         match self.cur_receive {
             Some(ref mut c) => Ok(c),
             None => Err(H2ErrorOut::Internal),
         }
-    }
+    } */
 }
 
 #[derive(Clone, Debug, PartialEq)]

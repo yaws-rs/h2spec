@@ -1,7 +1,5 @@
 //! Frame types
 
-use crate::StreamId;
-
 /// Frame Type RFC s. 6
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FrameType {

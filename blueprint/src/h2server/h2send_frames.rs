@@ -1,17 +1,5 @@
 //! Send H2 Frames
 
-/*
-let remaining = borrow_remaining_left_b(left_out_b, 0, 22);
-let bad_request =
-    "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n".as_bytes();
-
-let filled = match try_fill_left_with(remaining, &[bad_request, CRLF]) {
-    FillAttempt::Complete(filled) => filled,
-    FillAttempt::Overflow => break,
-};
-out_len += filled;
-*/
-
 type Remaining = u32;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
@@ -22,17 +10,17 @@ pub(crate) enum SendStage {
 }
 
 use super::*;
-use crate::{borrow_remaining_left_b, try_fill_left_with, FillAttempt};
 
 impl<App> H2Serving<App>
 where
-    App: H2FrameSender + H2FrameReceiver + H2Reset,
+    App: H2FrameSender + H2FrameReceiver,
 {
     pub(crate) fn send_h2frames(&mut self, mut remaining: &mut [u8]) -> StageSenderStatus {
         let mut filled = 0;
 
         loop {
-            if remaining.len() < 10 {
+            if (self.send_stage == SendStage::Header && remaining.len() < 9) || remaining.len() == 0
+            {
                 break;
             }
             if self.send_stage == SendStage::Header {
@@ -68,6 +56,12 @@ where
                 }
                 filled += n_filled;
                 remaining = &mut remaining[n_filled..];
+
+                let payload_remaining = send_remaining - n_filled as u32;
+                self.send_stage = match payload_remaining {
+                    0 => SendStage::Header,
+                    _ => SendStage::Payload(payload_remaining),
+                };
             }
         }
 

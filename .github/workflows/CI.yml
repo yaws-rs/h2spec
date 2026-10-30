@@ -1,0 +1,53 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  ci-pass:
+    name: CI is green
+    runs-on: ubuntu-latest
+    needs:
+      - check-test-all
+    steps:
+      - run: exit 0
+
+  build-nostds:
+    name: Build on no_std target (thumbv7em-none-eabi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: thumbv7em-none-eabi
+      - uses: taiki-e/install-action@cargo-hack
+      # No default features build
+      - name: no_std h2types
+        run: cargo build -p h11types --target thumbv7em-none-eabi --release
+      - name: no_std blueprint-h2spec
+        run: cargo build -p blueprint-h11spec --target thumbv7em-none-eabi --release --features h2server
+
+  check-test-all:
+    name: test, fmt, clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Obtain rick
+        run: curl --output /tmp/rick-roll.gif https://media.tenor.com/Lw4_T2lRPGoAAAAM/rickroll-meme.gif
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - run: cargo fmt --check
+      - run: cargo clippy
+      - run: cargo doc
+      - run: cargo test --all-features

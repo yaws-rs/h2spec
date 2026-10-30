@@ -156,6 +156,7 @@ impl H2Settings {
     }
 }
 
+#[cfg(test)]
 mod test {
 
     use super::*;

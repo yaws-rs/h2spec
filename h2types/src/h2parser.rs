@@ -1,5 +1,8 @@
 //! H2 Parser
 
+mod p_h2headers;
+pub use p_h2headers::*;
+
 use crate::FrameParserReceiver;
 use crate::ParsingError;
 use crate::StreamId;
@@ -101,6 +104,7 @@ impl FrameParser {
         let frame_id = r.header(frame_type, frame_flags, stream_id, len_u32);
 
         self.cur_frame_id = frame_id;
+
         self.cur_body_len = len_u32;
 
         return Ok(ParsingStatus::Complete(Expect::Header, 9));
@@ -120,7 +124,8 @@ impl FrameParser {
                     self.take_header(r, &input[discard..])?
                 }
                 ParsingStatus::Incomplete(Expect::Payload(p), _) if p > 0 => {
-                    self.take_body(r, &input[discard..])?
+                    let status = self.take_body(r, &input[discard..])?;
+                    status
                 }
                 _ => {
                     return Err(ParsingError::InvalidState);
