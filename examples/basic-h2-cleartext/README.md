@@ -21,6 +21,8 @@ Point curl at it:
 curl --http2-prior-knowledge http://localhost:7878 --output /tmp/test-rick.gif
 ```
 
+Note: Tested with curl 8.11.1 2024-12-11
+
 Feel free to ensure that Rick was pure:
 ```ignore
 sha256sum /tmp/rick-roll.gif
