@@ -1,4 +1,4 @@
 [workspace]
-members = ["h2types", "blueprint", "test_bp", "examples/*"]
+members = ["h2types", "blueprint", "examples/*"]
 #members = ["h2types", "blueprint", "apps/*", "test_bp"]
 resolver = "2"

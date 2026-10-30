@@ -1262,17 +1262,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "yaws-h2spec-test-bp"
-version = "0.0.1"
-dependencies = [
- "blueprint",
- "blueprint-h2spec",
- "criterion",
- "insta",
- "rstest",
-]
-
-[[package]]
 name = "ychunked"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
