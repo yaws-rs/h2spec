@@ -1,12 +1,12 @@
 //! H2 Framing
 
+use super::H2Serving;
 use super::StageHandlerStatus;
-use super::{H2Serving, H2ServingStage};
 use h2types::FrameParserReceiver;
 use h2types::H2ErrorOut;
+use h2types::H2FrameReceiver;
 use h2types::{FrameFlags, FrameType, StreamId};
 use h2types::{FrameParser, ParsingStatus};
-use h2types::{H2FrameReceiver, H2Reset};
 
 struct FramingRelay<'r, App> {
     h2serving: &'r mut H2Serving<App>,
@@ -26,7 +26,7 @@ impl<'r, App> FramingRelay<'r, App> {
 
 impl<'r, App> FrameParserReceiver for FramingRelay<'r, App>
 where
-    App: H2FrameReceiver + H2Reset,
+    App: H2FrameReceiver,
 {
     #[inline]
     fn header(
@@ -62,7 +62,7 @@ where
 
 impl<App> H2Serving<App>
 where
-    App: H2FrameReceiver + H2Reset,
+    App: H2FrameReceiver,
 {
     pub(crate) fn handle_h2frames(&mut self, left_in_b: &[u8]) -> StageHandlerStatus {
         let mut parser = FrameParser::default();

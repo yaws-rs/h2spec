@@ -1,18 +1,13 @@
 //! h11spec Upgrade Handling
 
 use h11types::H11Connection;
-use h11types::H11RequestMeta;
 
-use h11types::{H11Header, H11MaybeValue, H11Method, H11TransferEncoding, H11Version, Uri};
+use h11types::RespIndicative;
+use h11types::{H11Header, H11MaybeValue, H11Method, H11Version};
 use h11types::{
-    NoRequestTargetReceiver, RequestBodyReceiver, RequestHeaderReceiver, RequestReceiver,
-    RequestTargetReceiver,
-};
-use h11types::{
-    Resp2xx, RespComplete, RespIndicative, ResponseBodySize, ResponseSender, StatusDesc,
+    NoRequestTargetReceiver, RequestHeaderReceiver, RequestReceiver, RequestTargetReceiver,
 };
 
-use crate::H2Serving;
 use h2types::H2Settings;
 use h2types::H2SettingsError;
 
@@ -103,23 +98,5 @@ impl RequestHeaderReceiver for H11Upgrade {
     /// Headers processing has finished                                                                           
     fn req_headers_finish(&mut self) -> RespIndicative {
         RespIndicative::GoAhead
-    }
-}
-
-#[cfg(test)]
-mod test {
-
-    use super::*;
-    use rstest::*;
-
-    struct TestApp;
-    impl Reset for TestApp {
-        fn reset(&mut self) {}
-    }
-
-    #[rstest]
-    #[case("GET / HTTP/1.1\r\nHost: localhost:8080\r\nUser-Agent: curl/8.11.1\r\nAccept: */*\r\nConnection: Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: AAMAAABkAAQAAQAAAAIAAAAA\r\n\r\n")]
-    fn upgrade(#[case] input: &'static str) {
-        let mut h2 = H2Serving::with_app(TestApp);
     }
 }

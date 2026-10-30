@@ -11,7 +11,7 @@ repository = "https://github.com/yaws-rs/h2spec"
 categories = ["science"]
 
 [dependencies]
-logos = { version = "0.16", default-features = false, features = ["export_derive"] }
+#logos = { version = "0.16", default-features = false, features = ["export_derive"] }
 
 [dev-dependencies]
 insta = { version = "1.47" }

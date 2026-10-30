@@ -1,13 +1,22 @@
 //! H2App relaying H11App
 
 mod cur;
+mod frame_out;
+mod headers;
+
 use cur::*;
 
 use blueprint_h2spec::H2ErrorOut;
 use blueprint_h2spec::{
     H2FrameFlags as FrameFlags, H2FrameType as FrameType, H2StreamId as StreamId,
 };
-use blueprint_h2spec::{H2FrameMeta, H2FrameReceiver, H2FrameSender, H2Reset};
+use blueprint_h2spec::{H2FrameMeta, H2FrameReceiver, H2FrameSender};
+
+use blueprint_h11spec::{
+    RequestBodyReceiver, RequestHeaderReceiver, RequestReceiver, Reset, ResponseSender,
+};
+
+use log::debug;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 enum H2Expect {
@@ -24,37 +33,38 @@ struct InternalFrameOut {
     payload: Vec<u8>,
 }
 
+use std::collections::HashMap;
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct FlowControl {
+    consumed: u32,
+    remaining: usize,
+    max: u32,
+}
+
 #[derive(Clone, Default, Debug, PartialEq)]
-pub struct MyH2App {
+pub struct MyH2App<App> {
     expect: H2Expect,
     // We expect we receive these in order
     cur_receive: Option<CurFrameReceiving>,
     internal_frames_out: Vec<InternalFrameOut>,
     cur_frame_out: Option<InternalFrameOut>,
+    app: App,
+    fc_frames_out: HashMap<u32, App>,
+    fc_streams: HashMap<u32, FlowControl>,
 }
 
-impl H2Reset for MyH2App {
-    #[inline]
-    fn reset(&mut self) {
-        // We should probably nuke this
-    }
-}
-
-impl H2FrameSender for MyH2App {
+impl<App> H2FrameSender for MyH2App<App>
+where
+    App: ResponseSender
+        + RequestReceiver
+        + RequestHeaderReceiver
+        + RequestBodyReceiver
+        + Default
+        + Reset,
+{
     fn send_start_meta(&mut self) -> Option<H2FrameMeta> {
-        let frame_out = match self.internal_frames_out.pop() {
-            Some(frame) => frame,
-            None => return None,
-        };
-
-        let mut meta = H2FrameMeta::new(frame_out.frame_type);
-        meta.set_flags(frame_out.frame_flags);
-        meta.set_stream_id(frame_out.stream_id);
-        let _ = meta.set_payload_len(frame_out.payload.len() as u32);
-
-        self.cur_frame_out = Some(frame_out);
-
-        Some(meta)
+        self.try_next_frame_meta()
     }
     fn send_payload(&mut self, payload: &mut [u8]) -> usize {
         let cur = match self.cur_frame_out {
@@ -75,7 +85,7 @@ impl H2FrameSender for MyH2App {
 
         let new_slice = &cur.payload[copy_len..];
         let mut new_payload = Vec::with_capacity(new_slice.len());
-        new_payload.copy_from_slice(&new_slice);
+        new_payload.extend(new_slice);
 
         cur.payload = new_payload;
 
@@ -83,48 +93,97 @@ impl H2FrameSender for MyH2App {
     }
 }
 
-impl MyH2App {
+impl<App> MyH2App<App>
+where
+    App: ResponseSender
+        + RequestReceiver
+        + RequestHeaderReceiver
+        + RequestBodyReceiver
+        + Default
+        + Reset,
+{
     #[inline]
     fn handle_window_update(&mut self) -> Result<(), H2ErrorOut> {
         let cur = self.get_cur(FrameType::WindowUpdate)?;
-        println!(
+        debug!(
             "StreamId[{:?}] WINDOW_UPDATE Flags/{:?} Buf[{}]={:?}",
             cur.stream_id,
             cur.frame_flags,
             cur.internal_buffer.len(),
             &cur.internal_buffer
         );
+
+        let b_size = [
+            cur.internal_buffer[0],
+            cur.internal_buffer[1],
+            cur.internal_buffer[2],
+            cur.internal_buffer[3],
+        ];
+
+        let fc_len = u32::from_be_bytes(b_size);
+
+        let mut fc_stream = self.fc_streams.get_mut(&cur.stream_id.as_u32());
+        let flow_control = match fc_stream {
+            Some(ref mut fc) => fc,
+            None => return Ok(()),
+        };
+
+        flow_control.max = fc_len;
+
+        debug!("Updating to window to {fc_len}");
+
         Ok(())
     }
     #[inline]
     fn handle_settings(&mut self) -> Result<(), H2ErrorOut> {
-        let cur = self.get_cur(FrameType::Settings)?;
+        let cur = self.get_cur_mut(FrameType::Settings)?;
 
-        println!(
+        debug!(
             "StreamId[{:?}] SETTINGS Flags/{:?} Buf[{}]={:?}",
             cur.stream_id,
             cur.frame_flags,
             cur.internal_buffer.len(),
             &cur.internal_buffer
         );
+
+        if cur.frame_flags.as_u8() == 0 {
+            let ack_out = InternalFrameOut {
+                stream_id: StreamId::unchecked_new(0),
+                frame_type: FrameType::Settings,
+                frame_flags: FrameFlags::from_u8(1),
+                payload: vec![],
+            };
+
+            self.internal_frames_out.push(ack_out);
+        }
+
         Ok(())
     }
     #[inline]
     fn handle_go_away(&mut self) -> Result<(), H2ErrorOut> {
         let cur = self.get_cur(FrameType::GoAway)?;
 
-        println!(
+        debug!(
             "StreamId[{:?}] GO AWAY Flags/{:?} Buf[{}]={:?}",
             cur.stream_id,
             cur.frame_flags,
             cur.internal_buffer.len(),
             &cur.internal_buffer
         );
-        Ok(())
+
+        Err(H2ErrorOut::Protocol)
     }
 }
 
-impl H2FrameReceiver for MyH2App {
+impl<App> H2FrameReceiver for MyH2App<App>
+where
+    App: ResponseSender
+        + RequestReceiver
+        + RequestHeaderReceiver
+        + RequestBodyReceiver
+        + Default
+        + Reset,
+{
     #[inline]
     fn header(
         &mut self,
@@ -152,18 +211,18 @@ impl H2FrameReceiver for MyH2App {
             }
         };
 
-        //println!("Cur Receive = {:?}", self.cur_receive);
+        if expect_len == 0 {
+            self.cur_receive = None;
+        }
 
         Ok(())
     }
     fn payload(&mut self, payload: &[u8], remaining: u32) -> Result<(), H2ErrorOut> {
-        //println!("Payload len {} - remaining {}", payload.len(), remaining);
-
         let mut internal: Option<FrameType> = None;
         let mut external: Option<FrameType> = None;
 
         if self.cur_is_internal() {
-            let cur = self.get_cur_mut()?;
+            let cur = self.get_cur_mut_any()?;
 
             cur.internal_buffer.extend(payload);
             internal = Some(cur.frame_type);
@@ -179,7 +238,7 @@ impl H2FrameReceiver for MyH2App {
                 FrameType::Settings => self.handle_settings()?,
                 FrameType::WindowUpdate => self.handle_window_update()?,
                 FrameType::GoAway => self.handle_go_away()?,
-                _ => {}
+                _ => todo!("Handle Internal frame {:?}", frame_type),
             }
         }
 
@@ -187,7 +246,12 @@ impl H2FrameReceiver for MyH2App {
             match frame_type {
                 FrameType::Settings => unreachable!(),
                 FrameType::WindowUpdate => unreachable!(),
-                _ => todo!("Need to handle Self = {:?} for payload", self),
+                FrameType::Headers => self.handle_headers(payload, remaining)?,
+                FrameType::RstStream => {
+                    // Shutdown
+                    return Ok(());
+                }
+                _ => todo!("Need to handle FrameType = {:?} for payload", frame_type),
             }
         }
 

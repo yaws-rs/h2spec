@@ -13,7 +13,12 @@ categories = ["science"]
 [dependencies]
 blueprint = { version = "0.2.0", default-features = false }
 blueprint-h2spec = { path = "../../blueprint", version = "0.0.1", default-features = false, features = ["h2server"] }
-#yaws-app-rick-roll = { version = "0.0.5", default-features = false }
+blueprint-h11spec = { version = "0.0.6", default-features = false, features = ["h11server"] }
+yaws-app-rick-roll = { version = "0.0.6", default-features = false }
+loona-hpack = { version = "0.4" }
+h11types = { version = "0.0.4" }
+log = { version = "0.4" }
+env_logger = { version = "0.11" }
 
 [features]
 default = []
