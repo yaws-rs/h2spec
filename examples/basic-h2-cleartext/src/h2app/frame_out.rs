@@ -21,7 +21,7 @@ where
         let mut fc_max: u32 = 0;
         for (stream_id, fc) in self.fc_streams.iter() {
             if fc.remaining > 0 {
-            //if fc.remaining > 0 && fc.max > 0 {
+                //if fc.remaining > 0 && fc.max > 0 {
                 chosen_stream = Some(*stream_id);
                 fc_max = fc.max;
                 remaining = fc.remaining;
