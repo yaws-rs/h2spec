@@ -6,7 +6,10 @@ We have set it to embed RickRoll H11 Application that spits him dancing out ever
 
 ## Run
 
-Download your chosen Rick Roll gif into /tmp/rick-roll.gif
+Download your chosen gif into /tmp/rick-roll.gif i.e.:
+```ignore
+curl --output /tmp/rick-roll.gif https://media.tenor.com/Lw4_T2lRPGoAAAAM/rickroll-meme.gif
+```
 
 Run the server:
 ```ignore
